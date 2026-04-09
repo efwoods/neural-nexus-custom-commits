@@ -35,5 +35,5 @@ Date:   Thu Apr 9 10:45:32 2026 -0400
  Your currently selected avatar will be used for git diff summaries for your current repository!
  Optional: Create a cron job to summarize changes intermittently with empty commits (messages only)
 
-## [Support the project if you enjoy!](www.neuralnexus.site/welcome)
+## [Support the project if you enjoy!](https://www.neuralnexus.site/welcome)
 - [Donate](https://github.com/sponsors/efwoods)

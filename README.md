@@ -23,7 +23,10 @@ Date:   Thu Apr 9 10:45:32 2026 -0400
 
     Initial commit
 
-
+## Get started in your repository:
+1. Clone this repository in your repo
+2. Run `./install.sh`
+3. Then follow the instructions below to select your avatar for the custom commit messages in your git log history using `python hourly_progress.py --current`.
 ## Instructions:
  Sign up for the Neural Nexus at api.neuralnexus.site
  Create an Avatar

@@ -1,11 +1,10 @@
-Since the last commit, I made these changes:
+### Changes since the last commit
 
-- **`README.md`**
-  - Added a new **“Results”** section at the top that documents the latest commit details and the setup/usage changes.
-  - Appended a **“Support the project if you enjoy!”** section with:
-    - A link to `www.neuralnexus.site/welcome`
-    - A **Donate** link to `https://github.com/sponsors/efwoods`
-  - Kept the existing formatting issue where the file **ends without a newline** (`\ No newline at end of file`).
+- **`hourly_progress.py`**
+  - Updated the HTTP endpoint from `https://api.neuralnexus.site/chat` to `http://api.neuralnexus.site/message`.
+  - Switched the request payload from `params={...}` to `data={...}`.
+  - Changed file upload handling from `files={"file": fp}` to `files=[("files", ("progress_1_hour.txt", fp, "text/plain"))]`.
+  - Removed the redundant line `update_response = update_response`.
 
 - **`progress_1_hour.txt`**
-  - Removed the entire contents of the file (it’s now empty).
+  - Removed all existing contents of the file (it’s now empty).

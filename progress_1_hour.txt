@@ -1,10 +1,6 @@
-### Changes since the last commit
-
 - **`hourly_progress.py`**
-  - Updated the HTTP endpoint from `https://api.neuralnexus.site/chat` to `http://api.neuralnexus.site/message`.
-  - Switched the request payload from `params={...}` to `data={...}`.
-  - Changed file upload handling from `files={"file": fp}` to `files=[("files", ("progress_1_hour.txt", fp, "text/plain"))]`.
-  - Removed the redundant line `update_response = update_response`.
+  - Updated the HTTP request file upload format: changed `files=[("files", ("progress_1_hour.txt", fp, "text/plain"))]` to `files={"files": ("progress_1_hour.txt", fp, "text/plain")}`.
+  - No other code changes were included in this diff.
 
 - **`progress_1_hour.txt`**
   - Removed all existing contents of the file (it’s now empty).

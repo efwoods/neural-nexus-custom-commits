@@ -17,6 +17,11 @@ set -u
 export HOME="${HOME:-/home/user}"
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$HOME/.local/bin"
 
+# hourly_progress.py declares its deps via PEP 723 inline metadata, so we run it
+# with `uv run --script`: uv resolves/caches httpx + python-dotenv into an
+# isolated env per script, ignoring any pyproject.toml in the worktree. No
+# per-worktree venv and no system-pip install (which PEP 668 blocks) is needed.
+
 ENV_FILE="$HOME/.config/hourly_progress.env"
 LOG_DIR="$HOME/.local/state/hourly_progress"
 LOG_FILE="$LOG_DIR/run.log"
@@ -31,6 +36,7 @@ if [ ! -f "$ENV_FILE" ]; then
   exit 1
 fi
 set -a
+# shellcheck source=/dev/null
 . "$ENV_FILE"
 set +a
 
@@ -39,6 +45,11 @@ if [ -z "${AVATAR_ID:-}" ] || [ -z "${NN_API_KEY:-}" ] || [ -z "${WT_ROOT:-}" ];
   exit 1
 fi
 export NN_API_KEY  # hourly_progress.py reads the key from the environment
+
+if ! command -v uv >/dev/null 2>&1; then
+  log "FATAL: uv not found on PATH ($PATH). Install uv (https://docs.astral.sh/uv/) — the script runs via 'uv run --script'."
+  exit 1
+fi
 
 if [ ! -d "$WT_ROOT" ]; then
   log "FATAL: WT_ROOT does not exist: $WT_ROOT"
@@ -52,15 +63,9 @@ for d in "$WT_ROOT"/*/; do
   [ -f "${d}hourly_progress.py" ] || continue   # skip worktrees without the script
   name="$(basename "$d")"
 
-  if [ -x "${d}.venv/bin/python" ]; then
-    py="${d}.venv/bin/python"
-  else
-    py="/usr/bin/python3"                        # fallback for worktrees without a venv
-  fi
-
   ran=$((ran + 1))
-  log "[$name] running: $py ./hourly_progress.py -c -a <AVATAR_ID>"
-  if ( cd "$d" && "$py" ./hourly_progress.py -c -a "$AVATAR_ID" ) >>"$LOG_FILE" 2>&1; then
+  log "[$name] running: uv run --script ./hourly_progress.py -c -a <AVATAR_ID>"
+  if ( cd "$d" && uv run --script ./hourly_progress.py -c -a "$AVATAR_ID" ) >>"$LOG_FILE" 2>&1; then
     log "[$name] OK"
     ok=$((ok + 1))
   else

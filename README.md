@@ -24,8 +24,10 @@ Date:   Thu Apr 9 10:45:32 2026 -0400
     Initial commit
 
 ## Requirements
-- Python 3 with `httpx` and `python-dotenv` (`pip install httpx python-dotenv`).
-  In a worktree that uses a virtualenv, install them into that `.venv`.
+- [`uv`](https://docs.astral.sh/uv/) on your `PATH`. The script declares its own
+  dependencies (`httpx`, `python-dotenv`) via PEP 723 inline metadata, so
+  `uv run` installs and caches them automatically on first run — no manual
+  `pip install` and no per-worktree virtualenv.
 - A Neural Nexus account, an Avatar, and your API key — see step 1 below.
 
 ## Quick start (single repository)
@@ -38,14 +40,14 @@ Date:   Thu Apr 9 10:45:32 2026 -0400
    current directory).
 4. Generate a commit message from your uncommitted changes:
    ```
-   python hourly_progress.py -c -a "$AVATAR_ID"
+   uv run --script hourly_progress.py -c -a "$AVATAR_ID"
    ```
    Your selected avatar writes the git-diff summary, commits it, and pushes.
 
 ## Automated setup (cron, all worktrees)
 Posts each worktree's progress to your avatar at **:20 and :50 every hour** by
-running `python ./hourly_progress.py -c -a $AVATAR_ID` in every worktree under
-your worktree root. New worktrees are picked up automatically.
+running `uv run --script ./hourly_progress.py -c -a $AVATAR_ID` in every worktree
+under your worktree root. New worktrees are picked up automatically.
 
 Clone this repo once and keep the checkout (it is the source `--worktree` copies
 from), then:
@@ -81,7 +83,7 @@ Test a run immediately (after steps 1–4):
 ### What `--setup` installs
 | Path | Purpose |
 | --- | --- |
-| `~/.local/bin/hourly_progress_all.sh` | Loops over every worktree under `WT_ROOT` and runs the script (uses each worktree's `.venv/bin/python`, falling back to `/usr/bin/python3`). |
+| `~/.local/bin/hourly_progress_all.sh` | Loops over every worktree under `WT_ROOT` and runs the script via `uv run --script` (uv resolves the PEP 723 deps into an isolated, cached env per script). |
 | `~/.config/hourly_progress.env` | Your `AVATAR_ID`, `NN_API_KEY`, and `WT_ROOT` (`chmod 600`, sourced by cron — cron can't see your shell env). |
 | crontab entry | `20,50 * * * *` → runs the wrapper, logging to `~/.local/state/hourly_progress/`. |
 
@@ -98,9 +100,10 @@ entry, run `./crontab.sh`.
   credential helper (`git config --global credential.helper store` with
   `~/.git-credentials`) or an SSH key without a passphrase / an SSH agent
   available to cron.
-- **Each worktree needs `httpx` + `python-dotenv`** available to the Python it
-  runs (its `.venv` or system Python), or that worktree's run will fail while the
-  others continue.
+- **`uv` must be on cron's `PATH`.** The wrapper adds `$HOME/.local/bin` (uv's
+  default install location) and aborts with a `FATAL` log line if `uv` is
+  missing. Dependencies themselves are handled by uv from the script's PEP 723
+  metadata, so there is nothing to install per worktree.
 
 ## [Support the project if you enjoy!](https://www.neuralnexus.site/welcome)
 - [Donate](https://github.com/sponsors/efwoods)

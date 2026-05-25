@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+#
+# hourly_progress_all.sh
+# ----------------------
+# Runs `./hourly_progress.py -c -a "$AVATAR_ID"` inside EVERY git worktree under
+# $WT_ROOT that contains the script. New worktrees are picked up automatically and
+# removed ones simply disappear from the loop — no edits needed as worktrees come
+# and go.
+#
+# Invoked by cron at minutes :20 and :50 of every hour. Cron runs with a minimal
+# environment, so this script sets PATH/HOME explicitly and sources its config
+# (AVATAR_ID, NN_API_KEY, WT_ROOT) from ~/.config/hourly_progress.env instead of
+# relying on the interactive shell.
+
+set -u
+
+export HOME="${HOME:-/home/user}"
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$HOME/.local/bin"
+
+ENV_FILE="$HOME/.config/hourly_progress.env"
+LOG_DIR="$HOME/.local/state/hourly_progress"
+LOG_FILE="$LOG_DIR/run.log"
+
+mkdir -p "$LOG_DIR"
+
+log() { printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >>"$LOG_FILE"; }
+
+# --- config / credentials --------------------------------------------------
+if [ ! -f "$ENV_FILE" ]; then
+  log "FATAL: config file not found: $ENV_FILE (run ./install.sh --setup)"
+  exit 1
+fi
+set -a
+. "$ENV_FILE"
+set +a
+
+if [ -z "${AVATAR_ID:-}" ] || [ -z "${NN_API_KEY:-}" ] || [ -z "${WT_ROOT:-}" ]; then
+  log "FATAL: AVATAR_ID, NN_API_KEY, and/or WT_ROOT are empty in $ENV_FILE — fill them in."
+  exit 1
+fi
+export NN_API_KEY  # hourly_progress.py reads the key from the environment
+
+if [ ! -d "$WT_ROOT" ]; then
+  log "FATAL: WT_ROOT does not exist: $WT_ROOT"
+  exit 1
+fi
+
+# --- run every worktree ----------------------------------------------------
+log "=== run start (root=$WT_ROOT) ==="
+ran=0; ok=0; fail=0
+for d in "$WT_ROOT"/*/; do
+  [ -f "${d}hourly_progress.py" ] || continue   # skip worktrees without the script
+  name="$(basename "$d")"
+
+  if [ -x "${d}.venv/bin/python" ]; then
+    py="${d}.venv/bin/python"
+  else
+    py="/usr/bin/python3"                        # fallback for worktrees without a venv
+  fi
+
+  ran=$((ran + 1))
+  log "[$name] running: $py ./hourly_progress.py -c -a <AVATAR_ID>"
+  if ( cd "$d" && "$py" ./hourly_progress.py -c -a "$AVATAR_ID" ) >>"$LOG_FILE" 2>&1; then
+    log "[$name] OK"
+    ok=$((ok + 1))
+  else
+    rc=$?
+    log "[$name] FAILED (exit $rc)"
+    fail=$((fail + 1))
+  fi
+done
+log "=== run done: ran=$ran ok=$ok fail=$fail ==="

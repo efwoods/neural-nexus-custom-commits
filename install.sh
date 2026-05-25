@@ -37,6 +37,11 @@ Usage:
   ./install.sh --worktree --all     Drop hourly_progress.py into every git worktree
                                     under WT_ROOT (read from $ENV_FILE).
 
+  ./install.sh --run                Run the cron job once, right now. Refreshes the
+                                    installed wrapper from this checkout, runs it the
+                                    way cron does, then tails today's log. Use to test
+                                    without waiting for :20/:50.
+
   ./install.sh --help               Show this help.
 
 See README.md for the full walkthrough.
@@ -88,6 +93,32 @@ install_worktree_all() {
   printf 'Done. Installed into %d worktree(s) under %s.\n' "$count" "$wt_root"
 }
 
+# Run the cron job once, immediately — the same wrapper cron invokes — then
+# show the tail of today's log so you can verify it without waiting for :20/:50.
+run_now() {
+  [ -f "$WRAPPER_SRC" ] || err "cannot find hourly_progress_all.sh next to install.sh"
+  [ -f "$ENV_FILE" ] || err "no config file ($ENV_FILE); run: $0 --setup"
+
+  # Refresh the installed wrapper from source first. cron runs the installed copy,
+  # which otherwise drifts from this repo (e.g. an older log name) and would make
+  # this test write somewhere other than the log we tail below.
+  mkdir -p "$BIN_DIR" "$STATE_DIR"
+  cp "$WRAPPER_SRC" "$WRAPPER_DST"
+  chmod 755 "$WRAPPER_DST"
+
+  local log_file err_file
+  log_file="$STATE_DIR/run_$(date '+%Y-%m-%d').log"
+  err_file="$STATE_DIR/err.log"
+  printf 'Refreshed wrapper -> %s\nRunning it now ...\n' "$WRAPPER_DST"
+  "$WRAPPER_DST" || true   # don't abort on per-worktree failures; err.log has details
+  # run_*.log holds only the worktree updates (the file uploaded to the avatar);
+  # operational status and any errors live in err.log — tail both to verify a run.
+  printf '\n--- tail of %s (worktree updates) ---\n' "$log_file"
+  [ -f "$log_file" ] && tail -n 40 "$log_file" || printf '(no updates written yet: %s)\n' "$log_file"
+  printf '\n--- tail of %s (operational + errors) ---\n' "$err_file"
+  [ -f "$err_file" ] && tail -n 40 "$err_file" || printf '(no errors logged: %s)\n' "$err_file"
+}
+
 # Machine-wide initial setup: wrapper + credentials file + cron entry.
 install_setup() {
   [ -f "$WRAPPER_SRC" ] || err "cannot find hourly_progress_all.sh next to install.sh"
@@ -133,10 +164,11 @@ Setup complete. Next steps:
        cd <worktree> && $SRC_DIR/install.sh --worktree
 
   The cron job runs at :20 and :50 every hour and posts each worktree's progress
-  to your avatar. Logs: $STATE_DIR/run.log (and cron.log).
+  to your avatar. Logs: $STATE_DIR/run_YYYY-MM-DD.log (worktree updates only — the
+  file uploaded to the avatar), err.log (operational lines + errors), and cron.log.
 
   Test a run now (after steps 1-3):
-    $WRAPPER_DST && tail -n 40 $STATE_DIR/run.log
+    $WRAPPER_DST && tail -n 40 "$STATE_DIR/err.log"
 EOF
 }
 
@@ -152,8 +184,9 @@ main() {
         install_worktree "${1:-$PWD}"
       fi
       ;;
+    -r|--run)      run_now ;;
     -h|--help)     usage ;;
-    *) err "unknown option: $1 (use --setup, --worktree [DIR|--all], or --help)" ;;
+    *) err "unknown option: $1 (use --setup, --worktree [DIR|--all], --run, or --help)" ;;
   esac
 }
 

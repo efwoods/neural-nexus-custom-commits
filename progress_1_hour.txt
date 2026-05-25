@@ -1,0 +1,38 @@
+In the `f-nn-cc-run-log-name-change` worktree, I made the following changes since the last commit (only what’s in the diff):
+
+- **`hourly_progress_all.sh`**
+  - Split logging into two files:
+    - `run_YYYY-MM-DD.log` now holds **worktree updates only** (the content that gets uploaded).
+    - `err.log` now holds **operational noise + errors** (run markers, OK/FAILED, FATAL/WARN, uv/Python/curl stderr, etc.).
+  - Changed `log()` so it writes to `err.log` (not the uploaded log).
+  - Updated the per-worktree run loop to:
+    - Capture each worktree’s **stdout** into a temp file.
+    - Append that stdout into `run_YYYY-MM-DD.log` under a worktree header **only if the run succeeded and stdout is non-empty**.
+    - On failure, keep any partial stdout out of the uploaded feed and record it in `err.log` instead.
+  - Added a `curl` upload step at the end:
+    - POSTs `run_YYYY-MM-DD.log` to `https://api.neuralnexus.site/update_avatar_identity_with_media`
+    - Uses multipart `-F files=@<log>` and sets `assistant_id=$AVATAR_ID`
+    - Does **not** manually set multipart `Content-Type` (curl handles the boundary)
+    - Upload failures are logged to `err.log` and do not fail the script.
+
+- **`install.sh`**
+  - Added a new `--run` option:
+    - Refreshes the installed wrapper from the current checkout
+    - Runs it immediately (like cron would)
+    - Tails today’s `run_YYYY-MM-DD.log` (worktree updates) and `err.log` (operational/errors)
+
+- **`README.md`**
+  - Updated documentation to reflect the new log layout:
+    - `run_YYYY-MM-DD.log` (uploaded, updates only)
+    - `err.log` (operational + errors, never uploaded)
+    - `cron.log` (cron-level stdout/stderr)
+  - Updated the “test a run immediately” instructions to use `./install.sh --run`.
+
+- **`CLAUDE.md`**
+  - Updated the wrapper description to include the new behavior:
+    - After looping worktrees, it uploads today’s dated log to the avatar via `curl -F` to `update_avatar_identity_with_media`.
+  - Updated the log naming expectations and the end-to-end dry-run tail command to use `run_$(date '+%Y-%m-%d').log`.
+  - Also noted the “uploaded log is split from operational output by design” behavior.  
+
+- **`hourly_progress.py`**
+  - Changed file mode from `100644` to `100755` (made it executable).

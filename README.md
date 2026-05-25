@@ -73,17 +73,23 @@ from), then:
    ```
 
 That's it. The cron job runs at :20 and :50; logs land in
-`~/.local/state/hourly_progress/run.log` (per-run) and `cron.log` (cron-level).
+`~/.local/state/hourly_progress/`:
+- `run_YYYY-MM-DD.log` — that day's worktree updates only; this is the file
+  uploaded to the avatar, so it is kept free of operational noise and errors.
+- `err.log` — operational lines and errors (run markers, per-worktree OK/FAILED,
+  FATAL/WARN, and any uv/Python/curl stderr). Never uploaded.
+- `cron.log` — cron-level stdout/stderr.
 
-Test a run immediately (after steps 1–4):
+Test a run immediately (after steps 1–4) — runs the cron job once, right now,
+exactly as cron would, then tails today's log:
 ```
-~/.local/bin/hourly_progress_all.sh && tail -n 40 ~/.local/state/hourly_progress/run.log
+./install.sh --run
 ```
 
 ### What `--setup` installs
 | Path | Purpose |
 | --- | --- |
-| `~/.local/bin/hourly_progress_all.sh` | Loops over every worktree under `WT_ROOT` and runs the script via `uv run --script` (uv resolves the PEP 723 deps into an isolated, cached env per script). |
+| `~/.local/bin/hourly_progress_all.sh` | Loops over every worktree under `WT_ROOT` and runs the script via `uv run --script` (uv resolves the PEP 723 deps into an isolated, cached env per script), then uploads that day's worktree-updates log (`run_YYYY-MM-DD.log`, kept free of operational noise) to the avatar's identity media so it learns from the accumulated progress. |
 | `~/.config/hourly_progress.env` | Your `AVATAR_ID`, `NN_API_KEY`, and `WT_ROOT` (`chmod 600`, sourced by cron — cron can't see your shell env). |
 | crontab entry | `20,50 * * * *` → runs the wrapper, logging to `~/.local/state/hourly_progress/`. |
 

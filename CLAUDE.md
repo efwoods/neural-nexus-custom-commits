@@ -45,7 +45,8 @@ install.sh --setup      → copies hourly_progress_all.sh to ~/.local/bin,
 crontab.sh              → idempotent cron entry: 20,50 * * * * → the wrapper
 hourly_progress_all.sh → cron-run wrapper; loops every worktree under $WT_ROOT
                           that contains hourly_progress.py and runs it via
-                          `uv run --script ... -c`
+                          `uv run --script ... -c`, then uploads the day's log
+                          to the avatar (see below)
 install.sh --worktree   → copies hourly_progress.py into one worktree (or --all)
 ```
 
@@ -61,7 +62,22 @@ install.sh --worktree   → copies hourly_progress.py into one worktree (or --al
   There is nothing to `pip install` per worktree.
 - `git push` under cron needs non-interactive auth (stored HTTPS credentials or
   a passphrase-less SSH key).
-- Logs: `~/.local/state/hourly_progress/run.log` (per run) and `cron.log`.
+- After the worktree loop, the wrapper POSTs the day's dated log to the avatar via
+  `curl -F` to `https://api.neuralnexus.site/update_avatar_identity_with_media`
+  (header `API-KEY`, multipart `files=@<log>`, `assistant_id=$AVATAR_ID`), so the
+  avatar indexes the day's accumulated progress. curl must set the multipart
+  `Content-Type` itself (boundary), so the wrapper never sets that header by hand.
+  Upload failures (including the HTTP error body) are logged to `err.log`, not
+  fatal — the commits/pushes already happened.
+- **The dated log is split from operational output by design.** The wrapper writes
+  each worktree's run two ways: the script's **stdout** (only the avatar's update —
+  the script sends every diagnostic to stderr) is appended under a worktree header
+  to `run_YYYY-MM-DD.log`, and its **stderr** plus all `log()` lines (run markers,
+  OK/FAILED, FATAL/WARN, uv/Python/curl stderr) go to `err.log`. Only
+  `run_YYYY-MM-DD.log` is uploaded, so the avatar never sees operational noise.
+- Logs in `~/.local/state/hourly_progress/`: `run_YYYY-MM-DD.log` (worktree updates
+  only, one file per day, the uploaded file), `err.log` (operational + errors), and
+  `cron.log` (cron-level stdout/stderr).
 - `install.sh --setup` and `crontab.sh` are safe to re-run; `--setup` never
   overwrites an existing env file.
 
@@ -78,5 +94,5 @@ shellcheck install.sh hourly_progress_all.sh crontab.sh
 python3 -c "import ast; ast.parse(open('hourly_progress.py').read()); print('syntax OK')"
 
 # End-to-end dry of the cron path
-~/.local/bin/hourly_progress_all.sh && tail -n 40 ~/.local/state/hourly_progress/run.log
+~/.local/bin/hourly_progress_all.sh && tail -n 40 ~/.local/state/hourly_progress/run_"$(date '+%Y-%m-%d')".log
 ```

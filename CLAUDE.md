@@ -80,18 +80,3 @@ python3 -c "import ast; ast.parse(open('hourly_progress.py').read()); print('syn
 # End-to-end dry of the cron path
 ~/.local/bin/hourly_progress_all.sh && tail -n 40 ~/.local/state/hourly_progress/run.log
 ```
-
-## Gotchas
-
-- **Deps live in the script, not `pyproject.toml`:** `hourly_progress.py` is run
-  standalone (copied into arbitrary worktrees), so its real deps are declared in
-  a PEP 723 inline block at the top of the file and resolved by `uv run
-  --script`. `pyproject.toml` (`dependencies = []`) and `main.py` are an unused
-  `uv init` scaffold — don't add the script's deps there expecting them to apply.
-- `hourly_progress.py` is **copied** into each worktree by `install.sh`, not
-  imported. This repo is the source of truth — edit it here, then re-run
-  `install.sh --worktree[--all]` to propagate changes.
-- This repo's own commit history is itself avatar-generated, so commit messages
-  read as first-person narration rather than conventional summaries.
-- `example_manager_avatar_description.md` is a sample avatar persona prompt, not
-  code used at runtime.

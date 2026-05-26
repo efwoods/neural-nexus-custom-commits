@@ -1,0 +1,39 @@
+ i need to add the AVATAR_ID from the config such that I may add the AVATAR_ID in this shell script command:
+
+
+mass_commit() {
+    if [[ $# -eq 0 ]]; then
+        echo "Error: Commit message or -F filename is required."
+        echo 'Usage:'
+        echo '  mass_commit "Your commit message"'
+        echo '  mass_commit -F filename'
+        return 1
+    fi
+
+    if [[ "$1" == "-nn" ]]; then
+	if [[ -f "./hourly_progress.py" ]]; then
+		python3 ./hourly_progress.py --current --mass_commit -a ${AVATAR_ID} >> ~/.local/state/hourly_progress/run_"$(date '+%Y-%m-%d')".log
+		return 0
+	else
+		echo "hourly_progress.py driver script required in current repository"
+		return 1
+	fi
+    
+    elif [[ "$1" == "-F" ]]; then
+       	if [[ -z "$2" ]]; then
+            echo "Error: Filename is required after -F."
+       	    return 1
+        fi
+
+       	if [[ ! -f "$2" ]]; then
+            echo "Error: File '$2' not found."
+       	    return 1
+        fi
+
+       	git add -A && git commit -F "$2" && git push
+    else
+        git add -A && git commit -m "$1" && git push
+    fi
+
+   
+}

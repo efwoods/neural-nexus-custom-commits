@@ -4,3 +4,4 @@
   repository (do not send for summarization, the logs should be appened along with the branch and repository); this should also be a manually triggered feature that is queryable (1 minute at minumum, acceptable arguments include all parameters for the date -d command i.e. 1 minute, 30 minutes, 1
   hour ago, 1 day ago, 1 week ago); big picture: this is allowing for a single log to be uploaded to the avatar and the avatar will be able to eventually run commands to query for the status of any given work of a developer at any given moment by using this command to append the logs since a given 
   time period to a log file that is uploaded to the avatar in a document. that document is loaded to a vectorstore and prompt injected into a system prompt such that there is working knowledge of the logs of all repositorys for a given period and that information is queryable from a user interface.
+

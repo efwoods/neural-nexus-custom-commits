@@ -1,33 +1,7 @@
-In the `f-git-logs` worktree, I made these changes since the last commit (only what’s in the diff):
+In the `f-git-logs` worktree, I made two small changes:
 
-- **`CLAUDE.md`**
-  - Updated the wrapper description to say it now **appends raw cross-repo git logs** (via `git_log_all.sh`) before uploading the day’s log.
-  - Added a full spec for **`git_log_all.sh`**:
-    - Collects raw `git log` (not summarized) for `test/dev/main` across:
-      - each top-level repo under `$GIT_LOG_ROOT`
-      - each registered submodule (via `git submodule foreach --recursive`)
-      - each linked worktree (via `git worktree list`), logged separately for its checked-out branch
-    - Does **not** recurse random nested clones / unregistered worktrees.
-    - Supports `--since` with normalization rules, and supports `--no-upload` when called by the cron wrapper.
-  - Updated the logging rules so `run_YYYY-MM-DD.log` now includes both:
-    - per-worktree avatar updates
-    - the raw cross-repo git logs
-  - Added `git_log_all.sh` to the shellcheck list and added on-demand query examples.
-
-- **`hourly_progress.env.example`**
-  - Added **`GIT_LOG_ROOT=""`** to configure where `git_log_all.sh` recurses for repos (defaults to the parent of `WT_ROOT` if unset).
-
-- **`hourly_progress_all.sh`**
-  - After the per-worktree loop and before the final upload, I added a step to run:
-    - `git_log_all.sh --since "30 minutes ago" --no-upload`
-  - The raw git logs get appended into the same daily `run_YYYY-MM-DD.log` (by writing into the wrapper’s log file), while diagnostics go to `err.log`.
-  - If `git_log_all.sh` isn’t present/executable, it logs a warning and skips collection.
-
-- **`install.sh`**
-  - Updated installation so **`git_log_all.sh` is copied into the installed bin dir** alongside `hourly_progress_all.sh`.
-  - Added checks that `git_log_all.sh` exists next to `install.sh`.
-  - Updated setup messaging and the cron description to reflect that the daily uploaded log now includes raw git logs too.
-  - Added on-demand query examples using the installed `git_log_all.sh`.
+- **`features/git_log_user_feature.md`**
+  - Added a trailing newline at the end of the file (it previously had no newline).
 
 - **`progress_1_hour.txt`**
-  - Removed the old content (it’s now empty in the diff).
+  - Cleared the file contents (it’s now empty in the diff).

@@ -45,8 +45,12 @@ install.sh --setup      → copies hourly_progress_all.sh to ~/.local/bin,
 crontab.sh              → idempotent cron entry: 20,50 * * * * → the wrapper
 hourly_progress_all.sh → cron-run wrapper; loops every worktree under $WT_ROOT
                           that contains hourly_progress.py and runs it via
-                          `uv run --script ... -c`, then uploads the day's log
-                          to the avatar (see below)
+                          `uv run --script ... -c`, appends raw cross-repo git logs
+                          (git_log_all.sh), then uploads the day's log to the avatar
+git_log_all.sh         → collects RAW `git log`: test/dev/main of each top-level repo
+                          under $GIT_LOG_ROOT, plus each linked worktree on its own
+                          branch; appends to the day's log; called by the wrapper at
+                          :20/:50 and runnable standalone as a query
 install.sh --worktree   → copies hourly_progress.py into one worktree (or --all)
 ```
 
@@ -62,6 +66,30 @@ install.sh --worktree   → copies hourly_progress.py into one worktree (or --al
   There is nothing to `pip install` per worktree.
 - `git push` under cron needs non-interactive auth (stored HTTPS credentials or
   a passphrase-less SSH key).
+- **Cross-repo git logs (`git_log_all.sh`).** After the worktree loop and before the
+  upload, the wrapper runs `git_log_all.sh --since "30 minutes ago" --no-upload`. The
+  collector scans `$GIT_LOG_ROOT` (default: parent of `WT_ROOT`, i.e.
+  `/home/user/gh/anubis-project`) and appends the **raw** `git log` (`--stat`, not
+  summarized) for three kinds of thing: each **top-level repo** (an immediate child
+  of the root whose `.git` is a real directory) gets its `test`/`dev`/`main` branches
+  (`##### repo: X #####`); each **registered submodule** of those repos — enumerated
+  via `git submodule foreach --recursive` — is logged as its own entry, also for
+  `test`/`dev`/`main` (`##### submodule: Y | parent: X #####`); and each **linked
+  worktree** — found via `git worktree list` — is logged **separately and only for
+  the branch it has checked out** (`##### worktree: Z | parent: X #####`). It
+  deliberately does **not** recurse the filesystem: stray nested clones that are NOT
+  registered submodules (e.g. `data/elon-musk-dataset`) and unregistered/stale
+  worktrees are never treated as repos. Worktree logs are read from the parent repo's
+  shared object store, so a broken worktree directory can't break collection. It is also a standalone,
+  queryable command: `./git_log_all.sh --since "<any date -d expr>"` (default
+  `"30 minutes ago"`; e.g. `"1 minute ago"`, `"1 hour ago"`, `"1 week ago"`). Run
+  standalone it uploads the day's log by default; run from the wrapper it passes
+  `--no-upload` so there is exactly one combined upload per cron cycle. `--since` is
+  normalized so the window is never under-shot: a valid `date -d` expression is used
+  as-is; an invalid but numeric one is rounded UP to a whole unit (`59.5 minutes ago`
+  → `60 minutes ago`, `1.5 hours ago` → `2 hours ago`); unparseable input maps to the
+  largest window (`1 week ago`); and any sub-minute window is floored to `1 minute
+  ago`. The collector needs no avatar credentials to collect — only to upload.
 - After the worktree loop, the wrapper POSTs the day's dated log to the avatar via
   `curl -F` to `https://api.neuralnexus.site/update_avatar_identity_with_media`
   (header `API-KEY`, multipart `files=@<log>`, `assistant_id=$AVATAR_ID`), so the
@@ -73,11 +101,13 @@ install.sh --worktree   → copies hourly_progress.py into one worktree (or --al
   each worktree's run two ways: the script's **stdout** (only the avatar's update —
   the script sends every diagnostic to stderr) is appended under a worktree header
   to `run_YYYY-MM-DD.log`, and its **stderr** plus all `log()` lines (run markers,
-  OK/FAILED, FATAL/WARN, uv/Python/curl stderr) go to `err.log`. Only
-  `run_YYYY-MM-DD.log` is uploaded, so the avatar never sees operational noise.
-- Logs in `~/.local/state/hourly_progress/`: `run_YYYY-MM-DD.log` (worktree updates
-  only, one file per day, the uploaded file), `err.log` (operational + errors), and
-  `cron.log` (cron-level stdout/stderr).
+  OK/FAILED, FATAL/WARN, uv/Python/curl stderr) go to `err.log`. `git_log_all.sh`
+  follows the same rule: the raw git logs it collects go straight into
+  `run_YYYY-MM-DD.log`, its diagnostics into `err.log`. Only `run_YYYY-MM-DD.log` is
+  uploaded, so the avatar never sees operational noise.
+- Logs in `~/.local/state/hourly_progress/`: `run_YYYY-MM-DD.log` (per-worktree avatar
+  updates **plus** the raw cross-repo git logs, one file per day, the uploaded file),
+  `err.log` (operational + errors), and `cron.log` (cron-level stdout/stderr).
 - `install.sh --setup` and `crontab.sh` are safe to re-run; `--setup` never
   overwrites an existing env file.
 
@@ -87,8 +117,12 @@ install.sh --worktree   → copies hourly_progress.py into one worktree (or --al
 # Run against the current repo (needs NN_API_KEY + an avatar id; uv installs deps)
 uv run --script hourly_progress.py -c -a "$AVATAR_ID"
 
+# Query cross-repo git logs for any period (appends to today's log; uploads by default)
+./git_log_all.sh --since "1 hour ago"            # any `date -d` expression
+./git_log_all.sh --since "1 week ago" --no-upload  # collect only, no avatar upload
+
 # Lint the shell scripts
-shellcheck install.sh hourly_progress_all.sh crontab.sh
+shellcheck install.sh hourly_progress_all.sh git_log_all.sh crontab.sh
 
 # Syntax-check the Python (there is no test suite)
 python3 -c "import ast; ast.parse(open('hourly_progress.py').read()); print('syntax OK')"

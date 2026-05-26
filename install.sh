@@ -16,6 +16,8 @@ ENV_FILE="$CONFIG_DIR/hourly_progress.env"
 ENV_EXAMPLE="$SRC_DIR/hourly_progress.env.example"
 WRAPPER_SRC="$SRC_DIR/hourly_progress_all.sh"
 WRAPPER_DST="$BIN_DIR/hourly_progress_all.sh"
+GITLOG_SRC="$SRC_DIR/git_log_all.sh"
+GITLOG_DST="$BIN_DIR/git_log_all.sh"
 SCRIPT_SRC="$SRC_DIR/hourly_progress.py"
 
 err() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
@@ -101,10 +103,14 @@ run_now() {
 
   # Refresh the installed wrapper from source first. cron runs the installed copy,
   # which otherwise drifts from this repo (e.g. an older log name) and would make
-  # this test write somewhere other than the log we tail below.
+  # this test write somewhere other than the log we tail below. The wrapper calls
+  # git_log_all.sh from its own directory, so refresh that alongside it.
+  [ -f "$GITLOG_SRC" ] || err "cannot find git_log_all.sh next to install.sh"
   mkdir -p "$BIN_DIR" "$STATE_DIR"
   cp "$WRAPPER_SRC" "$WRAPPER_DST"
   chmod 755 "$WRAPPER_DST"
+  cp "$GITLOG_SRC" "$GITLOG_DST"
+  chmod 755 "$GITLOG_DST"
 
   local log_file err_file
   log_file="$STATE_DIR/run_$(date '+%Y-%m-%d').log"
@@ -122,14 +128,18 @@ run_now() {
 # Machine-wide initial setup: wrapper + credentials file + cron entry.
 install_setup() {
   [ -f "$WRAPPER_SRC" ] || err "cannot find hourly_progress_all.sh next to install.sh"
+  [ -f "$GITLOG_SRC" ]  || err "cannot find git_log_all.sh next to install.sh"
   [ -f "$ENV_EXAMPLE" ] || err "cannot find hourly_progress.env.example next to install.sh"
 
   mkdir -p "$BIN_DIR" "$CONFIG_DIR" "$STATE_DIR"
 
-  # 1) cron wrapper
+  # 1) cron wrapper + the git-log collector it calls (must sit next to the wrapper)
   cp "$WRAPPER_SRC" "$WRAPPER_DST"
   chmod 755 "$WRAPPER_DST"
   printf 'Installed cron wrapper -> %s\n' "$WRAPPER_DST"
+  cp "$GITLOG_SRC" "$GITLOG_DST"
+  chmod 755 "$GITLOG_DST"
+  printf 'Installed git-log collector -> %s\n' "$GITLOG_DST"
 
   # 2) credentials file (never clobber an existing one)
   if [ -f "$ENV_FILE" ]; then
@@ -163,9 +173,15 @@ Setup complete. Next steps:
      or, per worktree:
        cd <worktree> && $SRC_DIR/install.sh --worktree
 
-  The cron job runs at :20 and :50 every hour and posts each worktree's progress
-  to your avatar. Logs: $STATE_DIR/run_YYYY-MM-DD.log (worktree updates only — the
-  file uploaded to the avatar), err.log (operational lines + errors), and cron.log.
+  The cron job runs at :20 and :50 every hour: it posts each worktree's progress to
+  your avatar AND appends the raw git log (test/dev/main branches of every repo under
+  GIT_LOG_ROOT) to the same daily log, then uploads it. Logs:
+  $STATE_DIR/run_YYYY-MM-DD.log (worktree updates + git logs — the file uploaded to
+  the avatar), err.log (operational lines + errors), and cron.log.
+
+  Query the git log for any period on demand (appends to today's log + uploads):
+    $GITLOG_DST --since "1 hour ago"
+    $GITLOG_DST --since "1 week ago" --no-upload
 
   Test a run now (after steps 1-3):
     $WRAPPER_DST && tail -n 40 "$STATE_DIR/err.log"

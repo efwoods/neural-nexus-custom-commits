@@ -99,6 +99,22 @@ for d in "$WT_ROOT"/*/; do
 done
 log "=== run done: ran=$ran ok=$ok fail=$fail ==="
 
+# --- append raw cross-repo git logs (NOT summarized) -----------------------
+# After the per-worktree avatar summaries, append the raw `git log` for the
+# test/dev/main branches of every repo under the project root, so the single daily
+# upload below carries both the narrated progress and the underlying committed
+# changes. git_log_all.sh writes straight into LOG_FILE itself; we run it with
+# --no-upload (the wrapper does one combined upload) and at the same 30-minute
+# window as this cron cadence. Its own stdout/stderr are diagnostics -> ERR_FILE.
+GIT_LOG_SCRIPT="$(dirname "$0")/git_log_all.sh"
+if [ -x "$GIT_LOG_SCRIPT" ]; then
+  log "appending cross-repo git logs (since '30 minutes ago')"
+  "$GIT_LOG_SCRIPT" --since "30 minutes ago" --no-upload >>"$ERR_FILE" 2>>"$ERR_FILE" \
+    || log "WARN: git_log_all.sh exited non-zero (see above)"
+else
+  log "WARN: git_log_all.sh not found/executable at $GIT_LOG_SCRIPT; skipping git-log collection"
+fi
+
 # --- upload today's log to the avatar --------------------------------------
 # Now that every worktree's update has been appended to today's dated log, push
 # the whole file to the avatar's identity media so it can learn from the day's
